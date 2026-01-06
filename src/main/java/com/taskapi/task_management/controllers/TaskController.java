@@ -1,5 +1,12 @@
 package com.taskapi.task_management.controllers;
 
+import com.taskapi.task_management.dto.TaskRequest;
+import com.taskapi.task_management.models.Task;
+import com.taskapi.task_management.service.TaskService;
+import org.apache.coyote.Response;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
@@ -7,100 +14,66 @@ import java.util.*;
 @RequestMapping("/tasks")
 public class TaskController {
 
-    private List<Task> tasks = new ArrayList<>();
-    private Long nextId = 1L;
-
-    // Constructor - kuch sample data add kar dete hain
-    public TaskController() {
-        tasks.add(new Task(nextId++, "Learn Spring Boot", "PENDING"));
-        tasks.add(new Task(nextId++, "Build REST API", "IN_PROGRESS"));
-    }
+    @Autowired
+    private TaskService taskService;
 
     @GetMapping
-    public List<Task> getAllTasks() {
-        return tasks;
+    public ResponseEntity<List<Task>> getAllTasks() {
+        List<Task> tasks = taskService.getAllTasks();
+        return ResponseEntity.ok(tasks);
     }
 
     @GetMapping("/{id}")
-    public Task getTaskById(@PathVariable Long id) {
-        return tasks.stream()
-                .filter(task -> task.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+    public ResponseEntity<Task> getTaskById(@PathVariable Long id) {
+        Task task = taskService.getTaskById(id);
+        return ResponseEntity.ok(task);
     }
 
     @PostMapping
-    public Task createTask(@RequestBody TaskRequest request) {
-        Task newTask = new Task(nextId++, request.getTitle(), "PENDING");
-        tasks.add(newTask);
-        return newTask;
+    public ResponseEntity<Task> createTask(@RequestBody TaskRequest request) {
+        Task newTask = taskService.createTask(request.getTitle(), request.getDescription(), request.getStatus(), request.getPriority(), request.getDueDate());
+        return ResponseEntity.status(HttpStatus.CREATED).body(newTask);
     }
 
     @PutMapping("/{id}")
-    public Task updateTask(@PathVariable Long id, @RequestBody TaskRequest request) {
-        Task task = tasks.stream()
-                .filter(t -> t.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-
-        if (task != null) {
-            task.setTitle(request.getTitle());
-            if (request.getStatus() != null) {
-                task.setStatus(request.getStatus());
-            }
-        }
-        return task;
+    public ResponseEntity<Task> updateTask(@PathVariable Long id, @RequestBody TaskRequest request) {
+        Task updatedTask = taskService.updateTask(id, request.getTitle(), request.getDescription(), request.getStatus(), request.getPriority(), request.getDueDate());
+        return ResponseEntity.ok(updatedTask);
     }
 
     @DeleteMapping("/{id}")
-    public String deleteTask(@PathVariable Long id) {
-        tasks.removeIf(task -> task.getId().equals(id));
-        return "Task deleted successfully";
+    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+        taskService.deleteTask(id);
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/search")
-    public List<Task> searchByStatus(@RequestParam String status) {
-        return tasks.stream()
-                .filter(task -> task.getStatus().equalsIgnoreCase(status))
-                .toList();
+    @GetMapping("/search/status")
+    public ResponseEntity<List<Task>> searchByStatus(@RequestParam String status) {
+        List<Task> tasks = taskService.getTasksByStatus(status);
+        return ResponseEntity.ok(tasks);
     }
 
-    @GetMapping("/count")
-    public int getTaskCount() {
-        return tasks.size();
+    @GetMapping("/search/priority")
+    public ResponseEntity<List<Task>> searchByPriority(@RequestParam String priority) {
+        List<Task> tasks = taskService.getTasksByPriority(priority);
+        return ResponseEntity.ok(tasks);
+    }
+
+    @GetMapping("/search/title")
+    public ResponseEntity<List<Task>> searchByTitle(@RequestParam String title) {
+        List<Task> tasks = taskService.getTasksByTitle(title);
+        return ResponseEntity.ok(tasks);
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", taskService.getTaskCount());
+        stats.put("pending", taskService.getTaskCountByStatus("PENDING"));
+        stats.put("inProgress", taskService.getTaskCountByStatus("IN_PROGRESS"));
+        stats.put("completed", taskService.getTaskCountByStatus("COMPLETED"));
+
+        return ResponseEntity.ok(stats);
     }
 }
 
-class Task {
-    private Long id;
-    private String title;
-    private String status;
-
-    public Task(Long id, String title, String status) {
-        this.id = id;
-        this.title = title;
-        this.status = status;
-    }
-
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-}
-
-class TaskRequest {
-    private String title;
-    private String status;
-
-    // Getters and Setters
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-}
